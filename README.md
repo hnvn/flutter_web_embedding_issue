@@ -1,6 +1,10 @@
 # Flutter web × Android WebView — minimal reproduction
 
-Minimal Flutter **web** app (CanvasKit) to demonstrate issues filed with the Flutter team:
+Minimal Flutter **web** app (CanvasKit) for [flutter/flutter](https://github.com/flutter/flutter/issues) reports.
+
+**Live demo:** https://hnvn.github.io/flutter_web_embedding_issue/
+
+## Issues demonstrated
 
 1. **Blank CJK `Text`** in Android WebView (layout OK, glyphs missing)
 2. **Incomplete `RepaintBoundary.toImage()`** for off-screen widgets (caption text missing)
@@ -8,59 +12,83 @@ Minimal Flutter **web** app (CanvasKit) to demonstrate issues filed with the Flu
 
 Works in Chrome on the same device; fails in embedded WebView (`; wv)` UA).
 
-## Build
+---
+
+## Deploy to GitHub Pages
+
+### One-time setup (GitHub repo settings)
+
+1. Open https://github.com/hnvn/flutter_web_embedding_issue/settings/pages
+2. **Build and deployment** → Source: **GitHub Actions**
+
+### Automatic deploy
+
+Push to `main` — workflow `.github/workflows/deploy-pages.yml` builds and deploys.
+
+### Local build
 
 ```bash
-cd examples/webview_repro
-flutter pub get
-flutter build web --release
+bash scripts/build_web.sh
+# output: build/web
 ```
 
-Serve `build/web` (HTTPS recommended):
+From zap-quiz monorepo:
 
 ```bash
-cd build/web
-python3 -m http.server 8080
+bash scripts/build_webview_repro_web.sh
 ```
 
-Or deploy to any static host and open the URL from a WebView shell.
+---
 
-## Test in Android WebView
+## Firebase Test Lab (WebView harness)
 
-### Option A — zap-quiz WebView harness
+Use the **zap-quiz WebView harness** APK to record video of this demo in a real Android WebView.
 
-From repo root:
+### 1. Deploy this app (see above)
+
+Confirm https://hnvn.github.io/flutter_web_embedding_issue/ loads in desktop Chrome.
+
+### 2. Build harness APKs (from zap-quiz repo)
 
 ```bash
 bash scripts/build_webview_harness_apk.sh
 ```
 
-Install the harness APK, then override the URL:
+Default URL is already set to the GitHub Pages demo in `tools/webview_harness/app/build.gradle.kts`.
+
+Override at runtime:
 
 ```bash
 adb shell am start -n io.zap_24k.quiz.webview_harness/.MainActivity \
-  --es quiz_url 'https://YOUR_HOST/webview_repro/index.html'
+  --es quiz_url 'https://hnvn.github.io/flutter_web_embedding_issue/'
 ```
 
-### Option B — any Android app with WebView
+### 3. Run on Firebase Test Lab
 
-```kotlin
-webView.settings.javaScriptEnabled = true
-webView.settings.domStorageEnabled = true
-webView.loadUrl("https://YOUR_HOST/webview_repro/index.html")
+1. **Test Lab** → **Instrumentation test**
+2. Upload:
+   - `build/webview_harness/zap-quiz-webview-harness-debug.apk`
+   - `build/webview_harness/zap-quiz-webview-harness-debug-androidTest.apk`
+3. Test: `io.zap_24k.quiz.webview_harness.QuizHarnessTest#waitForQuizToRender`
+4. Pick devices (Samsung Fold, Pixel 7, etc.)
+5. Review **video** at end of run — green “Quiz loaded” banner + repro UI
+
+The harness waits for Flutter canvas (`main.dart.js` + `<canvas>`) up to 2 minutes.
+
+---
+
+## Manual WebView test
+
+```bash
+adb install build/webview_harness/zap-quiz-webview-harness-debug.apk
+adb shell am start -n io.zap_24k.quiz.webview_harness/.MainActivity
 ```
 
-Enable USB debugging → `chrome://inspect` → inspect WebView console.
+`chrome://inspect` → inspect WebView → Console.
 
-## Expected vs actual
-
-| Check | Chrome (mobile) | Android WebView |
-|-------|-----------------|-----------------|
-| On-screen Japanese text | Visible | Often **blank** |
-| Capture preview caption | Visible | Often **missing** |
-| Expanded maxHeight | > 0 (e.g. 132) | Often **0.0** (red) |
+---
 
 ## Related
 
-- GitHub issue draft: [`docs/flutter-issue/GITHUB_ISSUE_TEMPLATE.md`](../../docs/flutter-issue/GITHUB_ISSUE_TEMPLATE.md)
-- Production workarounds: [`docs/lessons/webview-embedded-quiz-fixes.md`](../../docs/lessons/webview-embedded-quiz-fixes.md)
+- Flutter issue draft: [zap-quiz `docs/flutter-issue/GITHUB_ISSUE_TEMPLATE.md`](https://github.com/24karat-io/zap-quiz/blob/main/docs/flutter-issue/GITHUB_ISSUE_TEMPLATE.md) (if applicable)
+- Harness source: [zap-quiz `tools/webview_harness/`](https://github.com/24karat-io/zap-quiz/tree/main/tools/webview_harness)
